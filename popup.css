@@ -1,0 +1,31 @@
+body {
+	font-family: sans-serif;
+	padding: 10px;
+	width: 300px;
+}
+
+.section {
+	margin-bottom: 15px;
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 5px 0;
+}
+
+button {
+	padding: 5px 10px;
+}
+
+#speedDisplay,
+#volumeDisplay {
+	font-weight: bold;
+	min-width: 60px;
+	text-align: center;
+}
+
+input[type="range"] {
+	width: 100%;
+}

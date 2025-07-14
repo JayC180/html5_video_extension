@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Video Control</title>
+	<link rel="stylesheet" href="popup.css">
+	<!-- polyfill-->
+	<script src="https://unpkg.com/webextension-polyfill@0.10.0/dist/browser-polyfill.min.js"></script>
+</head>
+
+<body>
+	<div class="section">
+		<h3>Speed</h3>
+		<div class="row">
+			<button id="dec1">-1</button>
+			<button id="dec01">-0.1</button>
+			<span id="speedDisplay">1.00x</span>
+			<button id="inc01">+0.1</button>
+			<button id="inc1">+1</button>
+		</div>
+	</div>
+
+	<div class="section">
+		<h3>Volume</h3>
+		<div class="row">
+			<button id="volDec100">-100%</button>
+			<button id="volDec10">-10%</button>
+			<span id="volumeDisplay">100%</span>
+			<button id="volInc10">+10%</button>
+			<button id="volInc100">+100%</button>
+		</div>
+		<input type="range" id="volumeSlider" min="0" max="600" step="1" />
+		<div class="row">
+			<button id="mute">Mute</button>
+			<button id="resetVolume">Reset</button>
+		</div>
+	</div>
+
+	<script src="popup.js"></script>
+</body>
+
+</html>

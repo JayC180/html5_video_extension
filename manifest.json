@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Video Speed & Volume Control",
+  "version": "1.0",
+  "description": "Control for speed and volume when playing HTML5 videos.",
+  "permissions": ["storage", "scripting", "activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+    },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": ["<all_urls>"]
+}
+
