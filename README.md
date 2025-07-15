@@ -9,3 +9,12 @@ Control for speed and volume when playing HTML5 videos.
 - `d`: freeze to last frame
 - `f`: freeze to next frame
 - `ctrl + ←/→`: back/forward 30 seconds
+
+## Installation
+### Firefox
+- Awaiting review...
+### Chrome
+1. Download the zip file from release
+2. Open `chrome://extensions/`
+3. Turn on developer mode
+4. Drag and drop the zip file
