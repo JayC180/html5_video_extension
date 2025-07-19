@@ -5,6 +5,70 @@ const defaultRate = 1.0;
 
 let lastSpeed = defaultRate;
 let lastVolume = 100;
+let lastVolumePercent = 100;
+
+// shadow DOM
+function hackAttachShadow() {
+	if (window._hasHackAttachShadow_) return;
+	try {
+		const raw = Element.prototype.attachShadow;
+		Element.prototype.attachShadow = function(init) {
+			if (init && init.mode) {
+				init.mode = "open"; // force open
+			}
+			const shadowRoot = raw.call(this, init);
+			console.log("[ShadowHack] Forced open shadow root on:", this);
+			return shadowRoot;
+		};
+		window._hasHackAttachShadow_ = true;
+	} catch (e) {
+		console.warn("[ShadowHack] Failed to hook attachShadow", e);
+	}
+}
+
+// weak set for managing mem
+function ready(selector, callback) {
+	const alreadyHandled = new WeakSet();
+
+	function checkAndRun(root = document) {
+		root.querySelectorAll(selector).forEach(el => {
+			if (!alreadyHandled.has(el)) {
+				alreadyHandled.add(el);
+				callback(el);
+			}
+		});
+
+		// shadow roots
+		root.querySelectorAll('*').forEach(el => {
+			if (el.shadowRoot) {
+				checkAndRun(el.shadowRoot);
+			}
+		});
+	}
+
+	checkAndRun();
+
+	// ob new elem
+	const observer = new MutationObserver(() => checkAndRun());
+	observer.observe(document.documentElement || document.body, {
+		childList: true,
+		subtree: true
+	});
+}
+
+function enhanceVideo(video) {
+	if (!video || video._enhancedByExtension) return;
+	video._enhancedByExtension = true;
+
+	// default vol 100
+	const savedVol = parseFloat(sessionStorage.getItem("volumeBoost")) || 100;
+	applyBoostedVolume(savedVol);
+
+	const savedSpeed = parseFloat(sessionStorage.getItem('playbackRate'));
+	if (savedSpeed && savedSpeed !== video.playbackRate) {
+		video.playbackRate = savedSpeed;
+	}
+}
 
 function showSpeedOverlay(speed) {
 	let overlay = document.getElementById('video-speed-overlay');
@@ -129,7 +193,7 @@ function onSpeedHotkey(e) {
 		return;
 	}
 
-	// F & D for frame freeze
+	// f & d for frame freeze
 	if (keyCode === 70) {
 		e.preventDefault();
 		e.stopImmediatePropagation();
@@ -184,7 +248,7 @@ function syncVideoState() {
 		sessionStorage.setItem('playbackRate', video.playbackRate);
 	}
 
-	// init boot tracking
+	// init boost tracking
 	if (!video._boost) {
 		video._boost = 1;
 	}
@@ -193,6 +257,58 @@ function syncVideoState() {
 	const currentVol = Math.round((video.volume * 100) * (video._boost || 1));
 	if (currentVol > 0) {
 		lastVolume = currentVol;
+	}
+}
+
+function applyBoostedVolume(totalPercent) {
+	const video = document.querySelector('video');
+	if (!video) return;
+
+	const clamped = Math.max(0, Math.min(600, totalPercent));
+
+	// update last vol if not muted
+	if (clamped > 0) {
+		lastVolumePercent = clamped;
+	}
+
+	sessionStorage.setItem("volumeBoost", clamped);
+
+	const base = Math.min(1, clamped / 100);
+	const boost = clamped > 100 ? clamped / 100 : 1;
+	const cappedBoost = Math.min(boost, 6);
+
+	video.volume = base;
+	video._boost = boost;
+
+	if (boost > 1) {
+		if (!video._gainNode) {
+			try {
+				const ctx = video._audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+				const source = video._mediaSource || ctx.createMediaElementSource(video);
+				const gainNode = ctx.createGain();
+				source.connect(gainNode).connect(ctx.destination);
+
+				video._audioCtx = ctx;
+				video._gainNode = gainNode;
+				video._mediaSource = source;
+			} catch (e) {
+				console.warn('Could not create audio context for volume boost:', e);
+				return;
+			}
+		}
+		if (video._audioCtx?.state === "suspended") {
+			video._audioCtx.resume().catch(err =>
+				console.warn('Failed to resume AudioContext:', err)
+			);
+		}
+
+		if (video._gainNode) {
+			video._gainNode.gain.value = cappedBoost;
+		}
+	} else {
+		if (video._gainNode) {
+			video._gainNode.gain.value = 1;
+		}
 	}
 }
 
@@ -206,6 +322,12 @@ const siteHooks = {
 };
 
 (function() {
+	// shadow dom first
+	hackAttachShadow();
+
+	// watch for vids for videos
+	ready("video", enhanceVideo);
+
 	const hostname = location.hostname;
 	const site = Object.keys(siteHooks).find(k => hostname.includes(k)) || 'default';
 	waitForYoutubePlayer(siteHooks[site].onReady);
@@ -308,38 +430,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 	return true;
 });
-
-function applyBoostedVolume(totalPercent) {
-	const video = document.querySelector('video');
-	if (!video) return;
-
-	const clamped = Math.max(0, Math.min(600, totalPercent));
-
-	// update last vol if not muted
-	if (clamped > 0) {
-		lastVolumePercent = clamped;
-	}
-
-	const base = Math.min(1, clamped / 100);
-	const boost = clamped > 100 ? clamped / 100 : 1;
-
-	video.volume = base;
-	video._boost = boost;
-
-	// use WebAudio api for gain
-	if (!video._gainNode && boost > 1) {
-		try {
-			const ctx = new (window.AudioContext || window.webkitAudioContext)();
-			const source = ctx.createMediaElementSource(video);
-			const gainNode = ctx.createGain();
-			source.connect(gainNode).connect(ctx.destination);
-			video._gainNode = gainNode;
-		} catch (e) {
-			console.warn('Could not create audio context for volume boost:', e);
-		}
-	}
-
-	if (video._gainNode) {
-		video._gainNode.gain.value = boost;
-	}
-}
